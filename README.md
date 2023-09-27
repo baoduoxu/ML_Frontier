@@ -2,7 +2,7 @@
 
 ## Method Chosen
 
-因此五个数据集包括一共可分为两类:
+五个数据集包括一共可分为两类:
 
 -  时间序列数据 $$(\{\mathbf{x}^{(1)}_ {t}\} _ {t=1}^T,\cdots,\{\mathbf{x}^{(N)}_ {t}\} _ {t=1}^T)\in \mathbb{R}^{N\times m\times T},\mathbf{x}_{t}^{(i)}\in\mathbb{R}^m$$
 - 非时间序列数据 $(\mathbf{x}^{(1)},\cdots,\mathbf{x}^{(N)})\in \mathbb{R}^{N\times m}$
