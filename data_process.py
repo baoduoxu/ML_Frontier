@@ -31,10 +31,12 @@ for label,data in mat_data.items():
 
     for i in range(N):
         if i in test_index:
-            X_test.append(scaler.fit_transform(data[i].T))
+            # X_test.append(scaler.fit_transform(data[i].T))
+            X_test.append(data[i].T)
             y_test.append(label)
         else:
-            X_train.append(scaler.fit_transform(data[i].T))
+            # X_train.append(scaler.fit_transform(data[i].T))
+            X_train.append(data[i].T)
             y_train.append(label)
 
 dict_labels = {label: i for i, label in enumerate(Labels)}

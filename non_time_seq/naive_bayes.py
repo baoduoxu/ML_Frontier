@@ -1,6 +1,8 @@
 import sys,os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) # 添加上层目录到 sys.path
-from data_process import X_test,X_train,y_test,y_train,Labels
+# from data_process import X_test,X_train
+from data_process import y_test,y_train,Labels
+from dimension_deduction import X_train,X_test
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
