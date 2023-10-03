@@ -9,7 +9,7 @@ if len(sys.argv)!=2:
     sys.exit(1)
 
 file_path=sys.argv[1]
-
+# file_path='dataset/ADNI.mat'
 mat_data=scipy.io.loadmat(file_path)
 test_ratio=0.3
 X_train=[]

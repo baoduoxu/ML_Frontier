@@ -49,18 +49,18 @@ X_test = scaler.transform(X_test)
 
 # 降维
 
-pca=PCA(n_components=23)
-X_train=pca.fit_transform(X_train)
-X_test=pca.fit_transform(X_test)
+# pca=PCA(n_components=23)
+# X_train=pca.fit_transform(X_train)
+# X_test=pca.fit_transform(X_test)
 
 
 
 # 创建LLE模型
-# lle = LocallyLinearEmbedding(n_neighbors=7, n_components=20, method='standard')
+lle = LocallyLinearEmbedding(n_neighbors=10, n_components=50, method='standard')
 
 # # 使用LLE模型拟合和降维数据
-# X_train = lle.fit_transform(X_train)
-# X_test = lle.fit_transform(X_test)
+X_train = lle.fit_transform(X_train)
+X_test = lle.fit_transform(X_test)
 
 # tsne=TSNE(n_components=3, learning_rate='auto',init='random', perplexity=17,early_exaggeration=15,random_state=0)
 # X_train=tsne.fit_transform(X_train)
