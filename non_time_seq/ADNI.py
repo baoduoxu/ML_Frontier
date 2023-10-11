@@ -5,6 +5,7 @@ from data_process import y_test,y_train,y_train_master,y_valid_master,y_valid
 from data_process import X_valid_MCI,X_train_MCI,y_valid_MCI,y_train_MCI
 # from dimension_reduction import X_train,X_valid,X_test
 from dimension_reduction_lda import dimension_reduction,visualization
+# from sampling import X_sampling,y_sampling
 import numpy as np
 from sklearn import svm
 from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
@@ -29,10 +30,12 @@ def classifier(X_test): # 主分类器, 将1,2,3看作一类-1
     X_train_new=np.concatenate((X_train,X_valid),axis=0)
     y_train_master_new=np.concatenate((y_train_master,y_valid_master),axis=0) # 无需验证集, 将train和validation合并
 
-
-    # X_train_reduced=dimension_reduction(X_train_new,y_train_master_new,dim=110,method='PCA')
+    # X_train_new=X_sampling
+    # y_train_master_new=y_sampling
+    # print(X_sampling)
+    X_train_reduced,proj=dimension_reduction(X_train_new,y_train_master_new,dim=2,method='LDA')
     # # X_train_reduced=dimension_reduction(X_train_reduced,y_train_master_new,dim=60,method='Laplacian')
-    # X_train_reduced,_=dimension_reduction(X_train_reduced,y_train_master_new,dim=dim,method='LDA')
+    # X_train_reduced,proj=dimension_reduction(X_train_reduced,y_train_master_new,dim=dim,method='LDA')
     # visualization(X_train_reduced,y_train_master_new,dim=dim,method='LDA',class_num=3)
 
     # X_valid_reduced=dimension_reduction(X_valid,y_valid_master,dim=40,method='PCA')
@@ -42,9 +45,9 @@ def classifier(X_test): # 主分类器, 将1,2,3看作一类-1
     
     
     # X_test_reduced=dimension_reduction(X_test,y_test_master,dim=40,method='PCA')
-    # X_test_reduced=np.dot(X_test_reduced,proj)[:,:dim]
+    X_test_reduced=np.dot(X_test,np.linalg.pinv(proj).T)
     # # X_test_reduced,_=dimension_reduction(X_test_reduced,y_test_master,dim=dim,method='LDA')
-    # visualization(X_test_reduced,y_test_master,dim=dim,method='LDA',class_num=3)
+    visualization(X_test_reduced,y_test_master,dim=dim,method='LDA',class_num=3)
     
     # # 对 X_train 进行降维
     # X_train_reduced,_=dimension_reduction(X_train_new,y_train_master_new,dim=2,method='LDA')
@@ -53,7 +56,7 @@ def classifier(X_test): # 主分类器, 将1,2,3看作一类-1
     # print(proj.shape)
     # X_test_reduced,_=dimension_reduction(X_test,y_test_master,dim=2,method='LDA')
     # # X_test_reduced=np.dot(X_test-np.mean(X_test),proj)[:,:dim] # 使用对训练集降维的线性变换对测试集进行降维
-    y_pred=_svm(X_train_new,y_train_master_new,X_test,y_test_master) # 不降维直接用SVM
+    y_pred=_svm(X_train_reduced,y_train_master_new,X_test,y_test_master) # 不降维直接用SVM
     print(y_pred)
     print(y_test_master)
     # y_pred=_svm(X_train_reduced,y_train_master_new,X_test_reduced,y_test_master)
