@@ -11,6 +11,7 @@ def train_and_test(net,num_epochs,train_dataset,test_dataset,batch_size,optimize
     train_accs=[]
     n_train=len(train_dataset) # 训练集样本数目
     n_test=len(test_dataset)
+    net.train()
     for epoch in range(num_epochs):
         train_l_sum, train_acc= 0.0, 0.0
         correct=0
