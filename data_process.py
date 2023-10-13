@@ -114,9 +114,9 @@ def normalize(X):
         # X=(X-np.mean(X,axis=0))/np.std(X,axis=0)
     return X
 
-X_train=normalize(X_train)
-X_valid=normalize(X_valid)
-X_train_MCI=normalize(X_train_MCI)
-X_valid_MCI=normalize(X_valid_MCI)
-X_test=normalize(X_test)
-X_test_MCI=normalize(X_test_MCI)
+# X_train=normalize(X_train)
+# X_valid=normalize(X_valid)
+# X_train_MCI=normalize(X_train_MCI)
+# X_valid_MCI=normalize(X_valid_MCI)
+# X_test=normalize(X_test)
+# X_test_MCI=normalize(X_test_MCI)

@@ -21,15 +21,13 @@ import torch_geometric.nn as pyg_nn
 from sklearn.neighbors import NearestNeighbors
 import scipy.sparse as sp
 
-def construct_knn_graph(X,y, k=5, metric='unsupervised'):
+def construct_knn_graph(X, y, k=5, metric='unsupervised'):
     '''
     Description: Construct the knn graph of the data.
-    
     Input:
     - X: Train data and test data.
     - y: The label of train data.
     - k: The number of nearest neighbors.
-    
     Return:
         - the knn graph of the data.
     '''
@@ -39,10 +37,11 @@ def construct_knn_graph(X,y, k=5, metric='unsupervised'):
     adj_mat=np.zeros((len(X),len(X)))
     for i in range(len(X)):
         for j in range(k):
-            adj_mat[i][indices[i][j]]=1
+            adj_mat[i][indices[i][j]] = 1
+            adj_mat[indices[i][j]][i] = 1
     edge_index = []
-    for i in range(len(X_train)):
-        for j in range(len(X_train)):
+    for i in range(len(X)):
+        for j in range(len(X)):
             if j>i and adj_mat[i][j]==1:
                 edge_index.append([i,j])
     edge_index = torch.tensor(edge_index).T
@@ -51,44 +50,44 @@ def construct_knn_graph(X,y, k=5, metric='unsupervised'):
     X = torch.tensor(X).float().to(device)
     y = torch.tensor(y).long().to(device)
     # print(X.shape,y.shape)
-    data = pyg.data.Data(x=X,edge_index=edge_index,y=y)
+    data = pyg.data.Data(x=X,edge_index=edge_index, y=y)
     return data
 
-X=np.concatenate((X_train,X_valid,X_test),axis=0)
+X = np.concatenate((X_train, X_valid, X_test), axis=0)
 # y=np.concatenate((y_train_master,y_valid_master,y_test_master),axis=0) # for ANDI
-y=np.concatenate((y_train,y_valid,y_test),axis=0)
+y = np.concatenate((y_train, y_valid, y_test), axis=0)
 # for ADNI, not PPMI
 # y[y==1]=0
 # y[y==4]=1
 # y[y==-1]=2
 # print(X,y)
-data=construct_knn_graph(X,y,k=10,metric='euclidean')
+data = construct_knn_graph(X, y, k=10, metric='euclidean')
 
 train_idx = np.array(range(X_train.shape[0]))
 val_idx = np.array(range(X_train.shape[0],X_train.shape[0]+X_valid.shape[0]))
 test_idx = np.array(range(X_train.shape[0]+X_valid.shape[0],X_train.shape[0]+X_valid.shape[0]+X_test.shape[0]))
-print(X.shape,y.shape)
-all_f=np.zeros((X.shape[0],),dtype=np.bool)
+print(X.shape, y.shape)
+all_f = np.zeros((X.shape[0],),dtype=np.bool)
 
-all_f_tmp=all_f.copy()
-all_f_tmp[train_idx]=True
-train_mask=all_f_tmp
+all_f_tmp = all_f.copy()
+all_f_tmp[train_idx] = True
+train_mask = all_f_tmp
 
-all_f_tmp=all_f.copy()
-all_f_tmp[val_idx]=True
-val_mask=all_f_tmp
+all_f_tmp = all_f.copy()
+all_f_tmp[val_idx] = True
+val_mask = all_f_tmp
 
-all_f_tmp=all_f.copy()
-all_f_tmp[test_idx]=True
-test_mask=all_f_tmp
+all_f_tmp = all_f.copy()
+all_f_tmp[test_idx] = True
+test_mask = all_f_tmp
 
-print(y.shape,train_idx.shape,val_idx.shape,test_idx.shape)
-print(train_mask.shape,val_mask.shape,test_mask.shape)
-print(y[train_mask].shape,y[val_mask].shape,y[test_mask].shape)
+print(y.shape, train_idx.shape, val_idx.shape, test_idx.shape)
+print(train_mask.shape, val_mask.shape, test_mask.shape)
+print(y[train_mask].shape, y[val_mask].shape, y[test_mask].shape)
 
-data.train_mask=train_mask
-data.val_mask=val_mask
-data.test_mask=test_mask
+data.train_mask = train_mask
+data.val_mask = val_mask
+data.test_mask = test_mask
 
 
 print(data)
@@ -107,20 +106,16 @@ if args.use_gdc:
                                            dim=0), exact=True)
     data = gdc(data)
 
-num_features=X_train.shape[1]
-num_classes=2
+num_features = X_train.shape[1]
+num_classes = 2
 
 class GCN(torch.nn.Module):
     def __init__(self):
         super(GCN, self).__init__()
         # GCNConv模型输入参数：输入结点特征维度，输出结点特征维度，是否cached和是否normalize；
-        self.conv1 = pyg_nn.GCNConv(num_features, 32, cached=True,
+        self.conv1 = pyg_nn.GCNConv(num_features, 16, cached=True,
                              normalize=not args.use_gdc)
-        # self.fc1=nn.Linear(16,8)
-        # self.fc2=nn.Linear(8,4)
-        self.conv2 = pyg_nn.GCNConv(32, 32, cached=True,
-                             normalize=not args.use_gdc)
-        self.conv3 = pyg_nn.GCNConv(32, num_classes, cached=True,
+        self.conv2 = pyg_nn.GCNConv(16, num_classes, cached=True,
                              normalize=not args.use_gdc)
         self.fc3 = nn.Linear(num_classes, 32)
         self.fc4 = nn.Linear(32, num_classes)
@@ -134,30 +129,16 @@ class GCN(torch.nn.Module):
         x = self.conv1(x, edge_index, edge_weight)
         x = F.relu(x)
         x = F.dropout(x, training=self.training)  # dropout操作，避免过拟合
-        
-        # x = self.fc1(x)
-        # x = F.relu(x)
-        # x=F.dropout(x,training=self.training)
-
-        # x = self.fc2(x)
-        # x = F.relu(x)
-        # x=F.dropout(x,training=self.training)
 
         x = self.conv2(x, edge_index, edge_weight)
-        x = F.relu(x)
-        x = F.dropout(x, training=self.training)
-
-        x = self.conv3(x, edge_index, edge_weight)
         
         x = self.fc3(x)
         x = F.relu(x)
-
-        x=self.fc4(x)
+        x = self.fc4(x)
         # x=F.dropout(x,training=self.training)
 
-        # x = self.fc5(x)
-
         return F.log_softmax(x, dim=1)  # 模型最后一层接上一个softmax和CNN类似
+
 
 model, data = GCN().to(device), data.to(device)
 
@@ -168,36 +149,39 @@ model, data = GCN().to(device), data.to(device)
 # ], lr=1e-2, momentum=0.9, nesterov=True)
 
 optimizer = torch.optim.AdamW([
-    dict(params=model.reg_params, weight_decay=1e-4),
-    dict(params=model.non_reg_params, weight_decay=0)
+    dict(params=model.reg_params),
+    dict(params=model.non_reg_params)
 ], lr=1e-2)
+
+lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, step_size=5000, gamma=0.1)
 
 
 def train():
     model.train()
     optimizer.zero_grad()
-    output=model()
-    loss=F.nll_loss(output[data.train_mask],data.y[data.train_mask])
+    output = model()
+    loss = F.nll_loss(output[data.train_mask],data.y[data.train_mask])
     loss.backward()
     optimizer.step()
+    lr_scheduler.step()
     return loss
 
 @torch.no_grad()
 
 def test():
     model.eval()
-    log, accs= model(), []
+    log, accs = model(), []
     for _,mask in data('train_mask','val_mask','test_mask'):
-        pred=log[mask].max(1)[1]
+        pred = log[mask].max(1)[1]
         # print(mask,data.y[mask].shape)
-        acc=pred.eq(data.y[mask]).sum().item()/mask.sum().item()
+        acc = pred.eq(data.y[mask]).sum().item()/mask.sum().item()
         accs.append(acc)
     return accs
 
 
 best_val_acc = test_acc = 0
-for epoch in range(1, 10001):
-    loss=train()
+for epoch in range(1, 30001):
+    loss = train()
     train_acc, val_acc, tmp_test_acc = test()
     if val_acc > best_val_acc:
         best_val_acc = val_acc
