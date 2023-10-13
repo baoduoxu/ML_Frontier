@@ -11,8 +11,8 @@ from sktime.classification.kernel_based._rocket_classifier import RocketClassifi
 from sktime.classification.kernel_based._svc import TimeSeriesSVC
 # from sktime.classification.kernel_based._rocket_classifier import ROCKETClassifier
 # 创建ShapeletTransformClassifier分类器
-# clf = HIVECOTEV2()
-clf=RocketClassifier()
+clf = HIVECOTEV2()
+# clf=RocketClassifier()
 
 # 拟合模型
 clf.fit(X_train, y_train)

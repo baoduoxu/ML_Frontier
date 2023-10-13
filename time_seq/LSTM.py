@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 # global variables
 num_workers = 0
 hidden_size = 16 # 隐藏层维度
+print(np.shape(X_train))
 input_size = np.shape(X_train)[2]
 output_size = len(Labels)
 seq_len=np.shape(X_train)[1]
@@ -64,6 +65,6 @@ lr,momentum,weight_decay=0.0008,0.9,0.001
 optimizer=torch.optim.RMSprop(net.parameters(), lr=lr, alpha=0.9, weight_decay=weight_decay)
 # optimizer=torch.optim.AdamW(net.parameters(), lr=lr, weight_decay=weight_decay)
 # optimizer=torch.optim.Adagrad(net.parameters(), lr=lr, weight_decay=weight_decay)
-loss=nn.CrossEntropyLoss()
+loss=nn.CrossEntropyLoss().to(device)
 init_hidden=torch.zeros(num_layers*num_directions,batch_size,hidden_size).to(device) 
 losses,train_accs,test_accs=train_and_test(net,num_epochs,train_dataset,test_dataset,batch_size,optimizer,loss,init_hidden)
