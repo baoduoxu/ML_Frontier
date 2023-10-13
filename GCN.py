@@ -40,9 +40,10 @@ def construct_knn_graph(X,y, k=5, metric='unsupervised'):
     for i in range(len(X)):
         for j in range(k):
             adj_mat[i][indices[i][j]]=1
+            adj_mat[indices[i][j]][i]=1
     edge_index = []
-    for i in range(len(X_train)):
-        for j in range(len(X_train)):
+    for i in range(len(X)):
+        for j in range(len(X)):
             if j>i and adj_mat[i][j]==1:
                 edge_index.append([i,j])
     edge_index = torch.tensor(edge_index).T
@@ -62,7 +63,7 @@ y=np.concatenate((y_train,y_valid,y_test),axis=0)
 # y[y==4]=1
 # y[y==-1]=2
 # print(X,y)
-data=construct_knn_graph(X,y,k=10,metric='euclidean')
+data=construct_knn_graph(X,y,k=50,metric='euclidean')
 
 train_idx = np.array(range(X_train.shape[0]))
 val_idx = np.array(range(X_train.shape[0],X_train.shape[0]+X_valid.shape[0]))
@@ -108,7 +109,7 @@ if args.use_gdc:
     data = gdc(data)
 
 num_features=X_train.shape[1]
-num_classes=2
+num_classes=5
 
 class GCN(torch.nn.Module):
     def __init__(self):
@@ -116,12 +117,12 @@ class GCN(torch.nn.Module):
         # GCNConv模型输入参数：输入结点特征维度，输出结点特征维度，是否cached和是否normalize；
         self.conv1 = pyg_nn.GCNConv(num_features, 16, cached=True,
                              normalize=not args.use_gdc)
-        # self.fc1=nn.Linear(16,8)
-        # self.fc2=nn.Linear(8,4)
+        self.fc1=nn.Linear(16,16)
+        # self.fc2=nn.Linear(16,16)
         self.conv2 = pyg_nn.GCNConv(16, num_classes, cached=True,
                              normalize=not args.use_gdc)
-        self.fc3=nn.Linear(num_classes,16)
-        self.fc4=nn.Linear(16,num_classes)
+        self.fc3=nn.Linear(num_classes,num_classes)
+        self.fc4=nn.Linear(num_classes,num_classes)
         self.reg_params = self.conv1.parameters()
         self.non_reg_params = self.conv2.parameters()
 
@@ -132,9 +133,9 @@ class GCN(torch.nn.Module):
         x = F.relu(x)
         x = F.dropout(x, training=self.training)  # dropout操作，避免过拟合
         
-        # x = self.fc1(x)
-        # x = F.relu(x)
-        # x=F.dropout(x,training=self.training)
+        x = self.fc1(x)
+        x = F.relu(x)
+        x=F.dropout(x,training=self.training)
 
         # x = self.fc2(x)
         # x = F.relu(x)
@@ -144,8 +145,8 @@ class GCN(torch.nn.Module):
         
         x = self.fc3(x)
         x = F.relu(x)
-
-        x=self.fc4(x)
+        # x=F.dropout(x,training=self.training)
+        # x=self.fc4(x)
         # x=F.dropout(x,training=self.training)
 
         return F.log_softmax(x, dim=1)  # 模型最后一层接上一个softmax和CNN类似
@@ -153,17 +154,23 @@ class GCN(torch.nn.Module):
 model,data=GCN().to(device),data.to(device)
 
 
-optimizer = torch.optim.SGD([
-    dict(params=model.reg_params, weight_decay=1e-4),
-    dict(params=model.non_reg_params, weight_decay=0)
-], lr=1e-2, momentum=0.9, nesterov=True)
+# optimizer = torch.optim.Adadelta([
+#     dict(params=model.reg_params, weight_decay=5e-3),
+#     dict(params=model.non_reg_params, weight_decay=0)
+# ], lr=5e-2)
+# optimizer = torch.optim.Adadelta(model.parameters(), lr=0.01, weight_decay=5e-4)
 
+optimizer = torch.optim.AdamW([
+    dict(params=model.reg_params, weight_decay=0.01),
+    dict(params=model.non_reg_params, weight_decay=0)
+], lr=1e-2)
 
 def train():
     model.train()
     optimizer.zero_grad()
     output=model()
     loss=F.nll_loss(output[data.train_mask],data.y[data.train_mask])
+    loss.backward()
     optimizer.step()
     return loss
 
@@ -181,7 +188,7 @@ def test():
 
 
 best_val_acc = test_acc = 0
-for epoch in range(1, 201):
+for epoch in range(1, 20001):
     loss=train()
     train_acc, val_acc, tmp_test_acc = test()
     if val_acc > best_val_acc:
