@@ -9,9 +9,11 @@ from data_process import X_test, X_train, X_valid, y_test_master
 from data_process import y_test, y_train, y_train_master, y_valid_master, y_valid
 from data_process import X_valid_MCI, X_train_MCI, y_valid_MCI, y_train_MCI, Labels
 from sklearn.neighbors import NearestNeighbors
+from torch_geometric.nn import MessagePassing
+from torch_geometric.nn import GATConv
 
 # 设置随机种子
-seed = 42
+seed = 7
 random.seed(seed)
 np.random.seed(seed)
 torch.manual_seed(seed)
@@ -107,16 +109,27 @@ def construct_random_graph(X, y, num_neighbors=5, density=0.1):
 class GCN(nn.Module):
     def __init__(self, num_node_features, num_classes):
         super(GCN, self).__init__()
-        self.conv1 = GCNConv(num_node_features, 32)
-        self.conv2 = GCNConv(32, num_classes)
-        self.norm = torch.nn.BatchNorm1d(32)
+        self.conv1 = GCNConv(num_node_features, 64)
+        self.conv2 = GCNConv(64, num_classes)
+        # self.conv1 = GATConv(num_node_features, 32, heads=2, dropout=0.5)
+        # self.conv2 = GATConv(32*2, num_classes, heads=4, concat=False, dropout=0.5)
+        self.norm = torch.nn.BatchNorm1d(64)
+
+        self.linear1 = nn.Linear(num_node_features, 32)
+        self.linear2 = nn.Linear(32, num_node_features)
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
+
+        x = self.linear1(x)
+        x = F.relu(x)
+        x = F.dropout(x, training=self.training)
+        x = self.linear2(x)
+
         x = self.conv1(x, edge_index)
         x = self.norm(x)
         x = F.relu(x)
-        x = F.dropout(x, training=self.training)
+        # x = F.dropout(x, training=self.training)
         x = self.conv2(x, edge_index)
 
         return x
@@ -130,7 +143,7 @@ def train():
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
     loss_function = torch.nn.CrossEntropyLoss().to(device)
     model.train()
-    for epoch in range(10000):
+    for epoch in range(400):
         out = model(data)
         optimizer.zero_grad()
         loss = loss_function(out[data.train_mask], data.y[data.train_mask])
@@ -152,8 +165,8 @@ def test():
 
 X = np.concatenate((X_train, X_valid, X_test), axis=0)
 y = np.concatenate((y_train, y_valid, y_test), axis=0)
-data = construct_knn_graph(X, y, k=186, metric='euclidean')
-# data = construct_random_graph(X, y, num_neighbors=50, density=0.1)
+# data = construct_knn_graph(X, y, k=186, metric='euclidean')
+data = construct_random_graph(X, y, num_neighbors=50, density=0.1)
 
 
 train_idx = np.array(range(X_train.shape[0]))

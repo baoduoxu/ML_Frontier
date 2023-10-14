@@ -3,12 +3,12 @@ import sys,os
 # current_directory = os.path.abspath(os.path.curdir)
 # parent_directory = os.path.dirname(current_directory)
 # sys.path.append(parent_directory)
-from data_process import X_test,X_train,X_valid,y_test_master
-from data_process import y_test,y_train,y_train_master,y_valid_master,y_valid
-from data_process import X_valid_MCI,X_train_MCI,y_valid_MCI,y_train_MCI,Labels
+from data_process import X_test, X_train, X_valid, y_test_master
+from data_process import y_test, y_train, y_train_master, y_valid_master, y_valid
+from data_process import X_valid_MCI, X_train_MCI, y_valid_MCI, y_train_MCI, Labels
 # from dimension_reduction import X_train,X_valid,X_test
-from dimension_reduction_lda import dimension_reduction,visualization
-from train_and_test import train_and_test,device
+from dimension_reduction_lda import dimension_reduction, visualization
+from train_and_test import train_and_test, device
 import torch
 import torch.nn as nn
 import numpy as np

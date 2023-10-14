@@ -40,17 +40,17 @@ X_test_MCI=[]
 y_test_MCI=[]
 import time
 import random
-random_seed=int(time.time())
+random_seed=7#int(time.time())
 # random_seed=4
 print(f'random seed: {random_seed}')
 np.random.seed(random_seed)
 
-for label,data in mat_data.items():
+for label, data in mat_data.items():
     if label.startswith('__'):
         continue
-    label_num=dict_labels[label]
-    N=np.shape(data)[0]
-    indices=np.random.permutation(N)
+    label_num = dict_labels[label]
+    N = np.shape(data)[0]
+    indices = np.random.permutation(N)
     train_end = int(train_ratio * N)
     valid_end = int((train_ratio + valid_ratio) * N)
 
@@ -63,7 +63,7 @@ for label,data in mat_data.items():
         if i in train_index:
             X_train.append(data[i])
             y_train.append(label_num)
-            if file_path=='dataset/ADNI.mat' and label_num>=1 and label_num<=3:
+            if file_path == 'dataset/ADNI.mat' and label_num>=1 and label_num<=3:
                 y_train_master.append(-1)
                 X_train_MCI.append(data[i]) # MCI, MCIn, MCIp 的训练集
                 y_train_MCI.append(label_num)
@@ -72,7 +72,7 @@ for label,data in mat_data.items():
         if i in validation_index:
             X_valid.append(data[i])
             y_valid.append(label_num)
-            if file_path=='dataset/ADNI.mat' and label_num>=1 and label_num<=3:
+            if file_path == 'dataset/ADNI.mat' and label_num>=1 and label_num<=3:
                 y_valid_master.append(-1)
                 X_valid_MCI.append(data[i]) # MCI, MCIn, MCIp 的验证集
                 y_valid_MCI.append(label_num)
@@ -81,7 +81,7 @@ for label,data in mat_data.items():
         if i in test_index:
             X_test.append(data[i])
             y_test.append(label_num)
-            if file_path=='dataset/ADNI.mat' and label_num>=1 and label_num<=3:
+            if file_path == 'dataset/ADNI.mat' and label_num>=1 and label_num<=3:
                 y_test_master.append(-1)
                 X_test_MCI.append(data[i]) # MCI, MCIn, MCIp 的测试集
                 y_test_MCI.append(label_num)
@@ -91,24 +91,24 @@ for label,data in mat_data.items():
 
 dict_labels_MCI = {label: i for i, label in enumerate(Labels[1:])}
 X_train = np.array(X_train)
-y_train=np.array(y_train)
-y_train_master=np.array(y_train_master)
+y_train = np.array(y_train)
+y_train_master = np.array(y_train_master)
 
 X_valid = np.array(X_valid)
-y_valid=np.array(y_valid)
-y_valid_master=np.array(y_valid_master)
+y_valid = np.array(y_valid)
+y_valid_master = np.array(y_valid_master)
 
 X_train_MCI = np.array(X_train_MCI)
-y_train_MCI=np.array(y_train_MCI)
+y_train_MCI = np.array(y_train_MCI)
 
 X_valid_MCI = np.array(X_valid_MCI)
-y_valid_MCI=np.array(y_valid_MCI)
+y_valid_MCI = np.array(y_valid_MCI)
 
 X_test = np.array(X_test)
-y_test=np.array(y_test)
-y_test_master=np.array(y_test_master)
+y_test = np.array(y_test)
+y_test_master = np.array(y_test_master)
 def normalize(X):
-    if X!=[]:
+    if X != []:
         scaler = StandardScaler()
         X = scaler.fit_transform(X)
         # X=(X-np.mean(X,axis=0))/np.std(X,axis=0)
