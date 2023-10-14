@@ -4,6 +4,37 @@ import scipy.io
 import numpy as np
 import sys
 from sklearn.preprocessing import StandardScaler
+import torch.nn.functional as nn
+import torch
+import time
+import random
+
+# 设置随机种子
+seed = 0
+torch.manual_seed(seed)
+torch.cuda.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
+np.random.seed(seed)
+random.seed(seed)
+torch.manual_seed(seed)
+torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.deterministic = True
+print('Random seed is set to {}.'.format(seed))
+
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    print('Random seed is set to {}.'.format(seed))
+
+
+set_seed(0)
+
 # if len(sys.argv)!=2:
 #     print('Usage: python data_process.py <dataset_path>')
 #     sys.exit(1)
@@ -38,12 +69,10 @@ y_train_MCI=[]
 y_valid_MCI=[]
 X_test_MCI=[]
 y_test_MCI=[]
-import time
-import random
-random_seed=7#int(time.time())
-# random_seed=4
-print(f'random seed: {random_seed}')
-np.random.seed(random_seed)
+
+
+
+
 
 for label, data in mat_data.items():
     if label.startswith('__'):
@@ -114,9 +143,9 @@ def normalize(X):
         # X=(X-np.mean(X,axis=0))/np.std(X,axis=0)
     return X
 
-# X_train=normalize(X_train)
-# X_valid=normalize(X_valid)
-# X_train_MCI=normalize(X_train_MCI)
-# X_valid_MCI=normalize(X_valid_MCI)
-# X_test=normalize(X_test)
-# X_test_MCI=normalize(X_test_MCI)
+X_train = normalize(X_train)
+X_valid = normalize(X_valid)
+X_train_MCI = normalize(X_train_MCI)
+X_valid_MCI = normalize(X_valid_MCI)
+X_test = normalize(X_test)
+X_test_MCI = normalize(X_test_MCI)

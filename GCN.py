@@ -25,44 +25,44 @@ train_num = X_train.shape[0]
 val_num = X_valid.shape[0]
 test_num = X_test.shape[0]
 
-# def construct_knn_graph(X, y, k=5, metric='unsupervised'):
-#     '''
-#     Description: Construct the knn graph of the data.
-#     Input:
-#     - X: Train data and test data.
-#     - y: The label of train data.
-#     - k: The number of nearest neighbors.
-#     Return:
-#         - the knn graph of the data.
-#     '''
-#     knn = NearestNeighbors(n_neighbors=k, metric=metric)
-#     knn.fit(X)
-#     _, indices = knn.kneighbors(X) # Indices of the nearest points in the population matrix.
-#     adj_mat = np.zeros((len(X), len(X)))
-#     for i in range(len(X)):
-#         for j in range(k):
-#             adj_mat[i][indices[i][j]] = 1
-#             adj_mat[indices[i][j]][i] = 1
-#     edge_index = []
-#     for i in range(len(X)):
-#         for j in range(len(X)):
-#             if j>i and adj_mat[i][j]==1: # 对于训练集中的数据，只有两个是同一类才连边
-#                 # edge_index.append([i,j])
-#                 if i>=train_num+val_num or j>=train_num+val_num: # 如果两个点有一个不是训练集，就直接根据邻接矩阵连边
-#                     edge_index.append([i, j])
-#                 if i<train_num+val_num and j<train_num+val_num and y[i]==y[j]:
-#                     edge_index.append([i, j])
-#     edge_index = torch.tensor(edge_index).T
-#     edge_index = edge_index.to(device)
-#     X = X.astype(np.float32)
-#     X = torch.tensor(X).float().to(device)
-#     y = torch.tensor(y).long().to(device)
-#     # print(X.shape,y.shape)
-#     data = pyg.data.Data(x=X, edge_index=edge_index, y=y)
-#     return data
+def construct_knn_graph(X, y, k=5, metric='unsupervised'):
+    '''
+    Description: Construct the knn graph of the data.
+    Input:
+    - X: Train data and test data.
+    - y: The label of train data.
+    - k: The number of nearest neighbors.
+    Return:
+        - the knn graph of the data.
+    '''
+    knn = NearestNeighbors(n_neighbors=k, metric=metric)
+    knn.fit(X)
+    _, indices = knn.kneighbors(X) # Indices of the nearest points in the population matrix.
+    adj_mat = np.zeros((len(X), len(X)))
+    for i in range(len(X)):
+        for j in range(k):
+            adj_mat[i][indices[i][j]] = 1
+            adj_mat[indices[i][j]][i] = 1
+    edge_index = []
+    for i in range(len(X)):
+        for j in range(len(X)):
+            if j>i and adj_mat[i][j]==1: # 对于训练集中的数据，只有两个是同一类才连边
+                # edge_index.append([i,j])
+                if i>=train_num or j>=train_num: # 如果两个点有一个不是训练集，就直接根据邻接矩阵连边
+                    edge_index.append([i, j])
+                if i<train_num and j<train_num and y[i]==y[j]:
+                    edge_index.append([i, j])
+    edge_index = torch.tensor(edge_index).T
+    edge_index = edge_index.to(device)
+    X = X.astype(np.float32)
+    X = torch.tensor(X).float().to(device)
+    y = torch.tensor(y).long().to(device)
+    # print(X.shape,y.shape)
+    data = pyg.data.Data(x=X, edge_index=edge_index, y=y)
+    return data
 
 
-def construct_random_graph(X, y, num_neighbors=5, density=0.1):
+def construct_random1_graph(X, y, num_neighbors=5, density=0.1):
     '''
     Description: Construct a random graph from the data.
     Input:
@@ -94,7 +94,7 @@ def construct_random_graph(X, y, num_neighbors=5, density=0.1):
     edge_index = np.where(adj_mat == 1)
     edge_index = torch.tensor(edge_index, dtype=torch.long).to(device)
 
-    X = X.astype(np.float32).to(device)
+    X = X.astype(np.float32)
     X = torch.tensor(X, dtype=torch.float32).to(device)
     y = torch.tensor(y, dtype=torch.long).to(device)
 
@@ -102,7 +102,32 @@ def construct_random_graph(X, y, num_neighbors=5, density=0.1):
 
     return data
 
+def construct_random2_graph(X, y, num_neighbors=5, prob_rewire=0.2):
+    '''
+    Description: Construct a random graph from the data.
+    Input:
+    - X: Data.
+    - y: Labels.
+    - num_neighbors: The number of neighbors for each node.
+    - prob_rewire: The probability of rewiring edges in the Watts-Strogatz model.
+    Return:
+    - A random graph as a PyTorch Geometric Data object.
+    '''
 
+    # Create a Watts-Strogatz random graph
+    G = nx.watts_strogatz_graph(len(X), num_neighbors, prob_rewire)
+
+    # Convert the NetworkX graph to a PyTorch Geometric Data object
+    edge_index = torch.tensor(list(G.edges()), dtype=torch.long).t()
+    edge_index = edge_index.to(device)
+
+    X = X.astype(np.float32)
+    X = torch.tensor(X, dtype=torch.float32).to(device)
+    y = torch.tensor(y, dtype=torch.long).to(device)
+
+    data = pyg.data.Data(x=X, edge_index=edge_index, y=y)
+
+    return data
 
 
 
@@ -115,8 +140,9 @@ y = np.concatenate((y_train, y_valid, y_test), axis=0)
 # y[y==4]=1
 # y[y==-1]=2
 # print(X,y)
-# data = construct_knn_graph(X, y, k=50, metric='euclidean')
-data = construct_random_graph(X, y, num_neighbors=50, density=0.1)
+data = construct_knn_graph(X, y, k=50, metric='euclidean')
+# data = construct_random1_graph(X, y, num_neighbors=50, density=0.1)
+# data = construct_random2_graph(X, y, num_neighbors=5, prob_rewire=0.2)
 
 train_idx = np.array(range(X_train.shape[0]))
 val_idx = np.array(range(X_train.shape[0], X_train.shape[0]+X_valid.shape[0]))
@@ -193,9 +219,9 @@ class GCN(torch.nn.Module):
         # x = self.bn2(x)
 
         
-        x = self.fc3(x)
-        x = F.relu(x)
-        x = self.fc4(x)
+        # x = self.fc3(x)
+        # x = F.relu(x)
+        # x = self.fc4(x)
 
         return F.log_softmax(x, dim=1)  # 模型最后一层接上一个softmax和CNN类似
 
@@ -220,7 +246,7 @@ def train():
     model.train()
     optimizer.zero_grad()
     output = model()
-    loss = F.nll_loss(output[data.train_and_val_mask], data.y[data.train_and_val_mask])
+    loss = F.nll_loss(output[data.train_mask], data.y[data.train_mask])
     loss.backward()
     optimizer.step()
     lr_scheduler.step()

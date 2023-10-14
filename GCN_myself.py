@@ -4,31 +4,44 @@ import torch.nn.functional as F
 import torch.nn as nn
 import numpy as np
 import torch_geometric as pyg
+import torch_geometric.data as pyg_data
 from torch_geometric.nn import GCNConv
+from data_process import seed, set_seed
 from data_process import X_test, X_train, X_valid, y_test_master
 from data_process import y_test, y_train, y_train_master, y_valid_master, y_valid
 from data_process import X_valid_MCI, X_train_MCI, y_valid_MCI, y_train_MCI, Labels
 from sklearn.neighbors import NearestNeighbors
 from torch_geometric.nn import MessagePassing
 from torch_geometric.nn import GATConv
+import networkx as nx
+from sklearn.decomposition import PCA
 
-# 设置随机种子
-seed = 7
-random.seed(seed)
-np.random.seed(seed)
-torch.manual_seed(seed)
-torch.cuda.manual_seed(seed)
-torch.cuda.manual_seed_all(seed)  # 如果使用多个 GPU
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
-print('Random seed is set to {}.'.format(seed))
 
+set_seed(seed)
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+### Hyperparameters
+run_epochs = 50000
+lr = 0.01
+weight_decay = 5e-4
+graph_type = 'knn'      # 'knn', 'random1', 'random2'
+k_neighbors = 30
+knn_metric = 'cosine'      # 'cosine', 'p', 'sqeucledian', 
+drop_ratio = 1
+# 'seuclidean', 'p', 'sqeuclidean', 'mahalanobis', 'pyfunc', 'jaccard', 'nan_euclidean', 'cityblock', 'manhattan', 'precomputed', 'cosine', 'yule', 'infinity', 'sokalsneath', 'rogerstanimoto', 'euclidean', 'russellrao', 'canberra', 'haversine', 'correlation', 'l1', 'chebyshev', 'sokalmichener', 'braycurtis', 'dice', 'l2', 'hamming', 'minkowski'
+density = 0.1
+
+
+### Load data
 train_num = X_train.shape[0]
 val_num = X_valid.shape[0]
 test_num = X_test.shape[0]
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+num_features = X_train.shape[1]
+num_classes = len(Labels)
 
-def construct_knn_graph(X, y, k=5, metric='unsupervised'):
+
+### Construct the graph
+def construct_knn_graph(X, y, val_idx, k=5, metric='unsupervised', ratio=0.3, drop_class=0):
     '''
     Description: Construct the knn graph of the data.
     Input:
@@ -44,17 +57,29 @@ def construct_knn_graph(X, y, k=5, metric='unsupervised'):
     adj_mat = np.zeros((len(X), len(X)))
     for i in range(len(X)):
         for j in range(k):
-            adj_mat[i][indices[i][j]] = 1
-            adj_mat[indices[i][j]][i] = 1
+            if i >= val_idx[0]:
+                # 随机选择 drop_class 个类，断开与这些类的连边
+                drop_class_idx = random.sample(range(len(Labels)), drop_class)
+                if indices[i][j] < val_idx[0] and y[indices[i][j]] in drop_class_idx:
+                    continue
+                # 随机选择 k/2 个邻居连边
+                random_sample = random.sample(range(k), int(k*ratio))
+                if j in random_sample:
+                    adj_mat[i][indices[i][j]] = 1
+                    adj_mat[indices[i][j]][i] = 1
+            else:
+                adj_mat[i][indices[i][j]] = 1
+                adj_mat[indices[i][j]][i] = 1
     edge_index = []
     for i in range(len(X)):
         for j in range(len(X)):
             if j>i and adj_mat[i][j]==1: # 对于训练集中的数据，只有两个是同一类才连边
                 # edge_index.append([i,j])
-                if i>=train_num+val_num or j>=train_num+val_num: # 如果两个点有一个不是训练集，就直接根据邻接矩阵连边
+                if i>=train_num or j>=train_num: # 如果两个点有一个不是训练集，就直接根据邻接矩阵连边
                     edge_index.append([i, j])
-                if i<train_num+val_num and j<train_num+val_num and y[i]==y[j]:
+                if i<train_num and j<train_num and y[i]==y[j]:
                     edge_index.append([i, j])
+
     edge_index = torch.tensor(edge_index).T
     edge_index = edge_index.to(device)
     X = X.astype(np.float32)
@@ -65,7 +90,7 @@ def construct_knn_graph(X, y, k=5, metric='unsupervised'):
     return data
 
 
-def construct_random_graph(X, y, num_neighbors=5, density=0.1):
+def construct_random1_graph(X, y, num_neighbors=5, density=0.1):
     '''
     Description: Construct a random graph from the data.
     Input:
@@ -106,113 +131,148 @@ def construct_random_graph(X, y, num_neighbors=5, density=0.1):
     return data
 
 
+def construct_random2_graph(X, y, num_neighbors=5, prob_rewire=0.2):
+    '''
+    Description: Construct a random graph from the data.
+    Input:
+    - X: Data.
+    - y: Labels.
+    - num_neighbors: The number of neighbors for each node.
+    - prob_rewire: The probability of rewiring edges in the Watts-Strogatz model.
+    Return:
+    - A random graph as a PyTorch Geometric Data object.
+    '''
+
+    # Create a Watts-Strogatz random graph
+    G = nx.watts_strogatz_graph(len(X), num_neighbors, prob_rewire)
+
+    # Convert the NetworkX graph to a PyTorch Geometric Data object
+    edge_index = torch.tensor(list(G.edges()), dtype=torch.long).t()
+    edge_index = edge_index.to(device)
+
+    X = X.astype(np.float32)
+    X = torch.tensor(X, dtype=torch.float32).to(device)
+    y = torch.tensor(y, dtype=torch.long).to(device)
+
+    data = pyg_data.Data(x=X, edge_index=edge_index, y=y)
+
+    return data
+
+
+### Define the model
 class GCN(nn.Module):
     def __init__(self, num_node_features, num_classes):
-        super(GCN, self).__init__()
+        super().__init__()
+
+        self.num_classes = num_classes
+
         # self.conv1 = GCNConv(num_node_features, 64)
         # self.conv2 = GCNConv(64, num_classes)
-        self.conv1 = GATConv(num_node_features, 32, heads=4, dropout=0.5)
-        self.conv2 = GATConv(32*4, num_classes, heads=4, concat=False, dropout=0.5)
-        self.norm = torch.nn.BatchNorm1d(32*4)
-
-        self.linear1 = nn.Linear(num_node_features, 32)
-        self.linear2 = nn.Linear(32, num_node_features)
+        # self.norm = torch.nn.BatchNorm1d(64)
+        self.conv1 = GATConv(num_node_features, 16, heads=8, dropout=0.5)
+        self.conv2 = GATConv(16*8, num_classes, heads=8, concat=False, dropout=0.5)
+        self.norm = torch.nn.BatchNorm1d(16*8)
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
 
-        # x = self.linear1(x)
-        # x = F.relu(x)
-        # x = F.dropout(x, training=self.training)
-        # x = self.linear2(x)
-
         x = self.conv1(x, edge_index)
         x = self.norm(x)
-        x = F.relu(x)
+        x = F.tanh(x)
         # x = F.dropout(x, training=self.training)
         x = self.conv2(x, edge_index)
 
         return x
-    
-num_features = X_train.shape[1]
-num_classes = 2
 
-model = GCN(num_features, num_features).to(device)
 
+### Train the model
 def train():
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+
+    test_acc = 0
+    best_test_acc = 0
+    best_test_epoch = 0
+    
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2000, gamma=0.5)
     loss_function = torch.nn.CrossEntropyLoss().to(device)
-    model.train()
-    for epoch in range(400):
+    for epoch in range(run_epochs):
+        model.train()
         out = model(data)
         optimizer.zero_grad()
         loss = loss_function(out[data.train_mask], data.y[data.train_mask])
         loss.backward()
         optimizer.step()
+        # lr_scheduler.step()
 
-        if epoch % 100 == 0:
-            print('Epoch {:03d} loss {:.4f}'.format(epoch, loss.item()))
+        train_acc, val_acc, test_acc = test()
+        if test_acc > best_test_acc:
+            best_test_acc = test_acc
+            best_test_epoch = epoch + 1
+            print("Best Epoch {:03d}: Train: {:.4f}, Val: {:.4f}, Test: {:.4f}".format(epoch+1, train_acc, val_acc, test_acc))
+
+        if (epoch+1) % 100 == 0:
+            log = 'Epoch: {:03d}, Loss:{:.4f}, Train: {:.4f}, Val: {:.4f}, Test: {:.4f}; Best Test: {:.4f} (epoch {:03d})'
+            print(log.format(epoch+1, loss, train_acc, val_acc, test_acc, best_test_acc, best_test_epoch))
 
 
+### Test the model
 def test():
-    _, pred = model(data).max(dim=1)
-    correct = int(pred[data.test_mask].eq(data.y[data.test_mask]).sum().item())
-    acc = correct / int(data.test_mask.sum())
-    print('GCN Accuracy: {:.4f}'.format(acc))
+    model.eval()
+    log, accs = model(data), []
+    for _, mask in data('train_mask', 'val_mask', 'test_mask'):
+        pred = log[mask].max(1)[1]
+        acc = pred.eq(data.y[mask]).sum().item() / mask.sum().item()
+        accs.append(acc)
+    return accs
 
 
 
+if __name__ == '__main__':
 
-X = np.concatenate((X_train, X_valid, X_test), axis=0)
-y = np.concatenate((y_train, y_valid, y_test), axis=0)
-data = construct_knn_graph(X, y, k=10, metric='euclidean')
-# data = construct_random_graph(X, y, num_neighbors=50, density=0.1)
+    model = GCN(num_features, num_classes).to(device)
 
+    ### Load and split the data
+    X = np.concatenate((X_train, X_valid, X_test), axis=0)
+    y = np.concatenate((y_train, y_valid, y_test), axis=0)
 
-train_idx = np.array(range(X_train.shape[0]))
-val_idx = np.array(range(X_train.shape[0], X_train.shape[0]+X_valid.shape[0]))
-train_and_val_idx = np.array(range(X_train.shape[0]+X_valid.shape[0]))
-test_idx = np.array(range(X_train.shape[0]+X_valid.shape[0], X_train.shape[0]+X_valid.shape[0]+X_test.shape[0]))
-print(X.shape, y.shape)
-all_f = np.zeros((X.shape[0],), dtype=np.bool)
+    train_idx = np.array(range(X_train.shape[0]))
+    val_idx = np.array(range(X_train.shape[0], X_train.shape[0]+X_valid.shape[0]))
+    train_and_val_idx = np.array(range(X_train.shape[0]+X_valid.shape[0]))
+    test_idx = np.array(range(X_train.shape[0]+X_valid.shape[0], X_train.shape[0]+X_valid.shape[0]+X_test.shape[0]))
+    print(X.shape, y.shape)
+    all_f = np.zeros((X.shape[0],), dtype=np.bool)
 
-all_f_tmp = all_f.copy()
-all_f_tmp[train_idx] = True
-train_mask = all_f_tmp
+    if graph_type == 'knn':
+        data = construct_knn_graph(X, y, val_idx=val_idx, k=k_neighbors, metric=knn_metric, ratio=drop_ratio)
+    elif graph_type == 'random1':
+        data = construct_random1_graph(X, y, val_idx=val_idx, num_neighbors=k_neighbors, density=density)
+    elif graph_type == 'random2':
+        data = construct_random2_graph(X, y, val_idx=val_idx, num_neighbors=k_neighbors, prob_rewire=density)
 
-all_f_tmp = all_f.copy()
-all_f_tmp[val_idx] = True
-val_mask = all_f_tmp
+    all_f_tmp = all_f.copy()
+    all_f_tmp[train_idx] = True
+    train_mask = all_f_tmp
 
-all_f_tmp = all_f.copy()
-all_f_tmp[train_and_val_idx] = True
-train_and_val_mask = all_f_tmp
+    all_f_tmp = all_f.copy()
+    all_f_tmp[val_idx] = True
+    val_mask = all_f_tmp
 
-all_f_tmp = all_f.copy()
-all_f_tmp[test_idx] = True
-test_mask = all_f_tmp
+    all_f_tmp = all_f.copy()
+    all_f_tmp[train_and_val_idx] = True
+    train_and_val_mask = all_f_tmp
 
-print(y.shape, train_idx.shape, val_idx.shape, train_and_val_idx.shape, test_idx.shape)
-print(train_mask.shape, val_mask.shape, train_and_val_mask.shape, test_mask.shape)
-print(y[train_mask].shape, y[val_mask].shape, y[train_and_val_mask].shape, y[test_mask].shape)
+    all_f_tmp = all_f.copy()
+    all_f_tmp[test_idx] = True
+    test_mask = all_f_tmp
 
-data.train_mask = train_mask
-data.val_mask = val_mask
-data.train_and_val_mask = train_and_val_mask
-data.test_mask = test_mask
+    print(y.shape, train_idx.shape, val_idx.shape, train_and_val_idx.shape, test_idx.shape)
+    print(train_mask.shape, val_mask.shape, train_and_val_mask.shape, test_mask.shape)
+    print(y[train_mask].shape, y[val_mask].shape, y[train_and_val_mask].shape, y[test_mask].shape)
 
+    data.train_mask = train_mask
+    data.val_mask = val_mask
+    data.train_and_val_mask = train_and_val_mask
+    data.test_mask = test_mask
 
-train()
-test()
-
-
-# best_val_acc = test_acc = 0
-# for epoch in range(1, 30001):
-#     loss = train()
-#     train_acc, val_acc, tmp_test_acc = test()
-#     if val_acc > best_val_acc:
-#         best_val_acc = val_acc
-#         test_acc = tmp_test_acc
-#     log = 'Epoch: {:03d}, Loss:{:.4f}, Train: {:.4f}, Val: {:.4f}, Test: {:.4f}'
-#     if epoch % 100 == 0:
-#         print(log.format(epoch, loss, train_acc, best_val_acc, test_acc))
+    ### Train the model and test the model
+    train()
