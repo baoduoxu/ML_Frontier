@@ -109,11 +109,11 @@ def construct_random_graph(X, y, num_neighbors=5, density=0.1):
 class GCN(nn.Module):
     def __init__(self, num_node_features, num_classes):
         super(GCN, self).__init__()
-        self.conv1 = GCNConv(num_node_features, 64)
-        self.conv2 = GCNConv(64, num_classes)
-        # self.conv1 = GATConv(num_node_features, 32, heads=2, dropout=0.5)
-        # self.conv2 = GATConv(32*2, num_classes, heads=4, concat=False, dropout=0.5)
-        self.norm = torch.nn.BatchNorm1d(64)
+        # self.conv1 = GCNConv(num_node_features, 64)
+        # self.conv2 = GCNConv(64, num_classes)
+        self.conv1 = GATConv(num_node_features, 32, heads=4, dropout=0.5)
+        self.conv2 = GATConv(32*4, num_classes, heads=4, concat=False, dropout=0.5)
+        self.norm = torch.nn.BatchNorm1d(32*4)
 
         self.linear1 = nn.Linear(num_node_features, 32)
         self.linear2 = nn.Linear(32, num_node_features)
@@ -121,10 +121,10 @@ class GCN(nn.Module):
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
 
-        x = self.linear1(x)
-        x = F.relu(x)
-        x = F.dropout(x, training=self.training)
-        x = self.linear2(x)
+        # x = self.linear1(x)
+        # x = F.relu(x)
+        # x = F.dropout(x, training=self.training)
+        # x = self.linear2(x)
 
         x = self.conv1(x, edge_index)
         x = self.norm(x)
@@ -165,8 +165,8 @@ def test():
 
 X = np.concatenate((X_train, X_valid, X_test), axis=0)
 y = np.concatenate((y_train, y_valid, y_test), axis=0)
-# data = construct_knn_graph(X, y, k=186, metric='euclidean')
-data = construct_random_graph(X, y, num_neighbors=50, density=0.1)
+data = construct_knn_graph(X, y, k=10, metric='euclidean')
+# data = construct_random_graph(X, y, num_neighbors=50, density=0.1)
 
 
 train_idx = np.array(range(X_train.shape[0]))
