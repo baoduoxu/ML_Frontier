@@ -21,37 +21,91 @@ import torch_geometric.nn as pyg_nn
 from sklearn.neighbors import NearestNeighbors
 import scipy.sparse as sp
 
-def construct_knn_graph(X, y, k=5, metric='unsupervised'):
+train_num = X_train.shape[0]
+val_num = X_valid.shape[0]
+test_num = X_test.shape[0]
+
+# def construct_knn_graph(X, y, k=5, metric='unsupervised'):
+#     '''
+#     Description: Construct the knn graph of the data.
+#     Input:
+#     - X: Train data and test data.
+#     - y: The label of train data.
+#     - k: The number of nearest neighbors.
+#     Return:
+#         - the knn graph of the data.
+#     '''
+#     knn = NearestNeighbors(n_neighbors=k, metric=metric)
+#     knn.fit(X)
+#     _, indices = knn.kneighbors(X) # Indices of the nearest points in the population matrix.
+#     adj_mat = np.zeros((len(X), len(X)))
+#     for i in range(len(X)):
+#         for j in range(k):
+#             adj_mat[i][indices[i][j]] = 1
+#             adj_mat[indices[i][j]][i] = 1
+#     edge_index = []
+#     for i in range(len(X)):
+#         for j in range(len(X)):
+#             if j>i and adj_mat[i][j]==1: # 对于训练集中的数据，只有两个是同一类才连边
+#                 # edge_index.append([i,j])
+#                 if i>=train_num+val_num or j>=train_num+val_num: # 如果两个点有一个不是训练集，就直接根据邻接矩阵连边
+#                     edge_index.append([i, j])
+#                 if i<train_num+val_num and j<train_num+val_num and y[i]==y[j]:
+#                     edge_index.append([i, j])
+#     edge_index = torch.tensor(edge_index).T
+#     edge_index = edge_index.to(device)
+#     X = X.astype(np.float32)
+#     X = torch.tensor(X).float().to(device)
+#     y = torch.tensor(y).long().to(device)
+#     # print(X.shape,y.shape)
+#     data = pyg.data.Data(x=X, edge_index=edge_index, y=y)
+#     return data
+
+
+def construct_random_graph(X, y, num_neighbors=5, density=0.1):
     '''
-    Description: Construct the knn graph of the data.
+    Description: Construct a random graph from the data.
     Input:
-    - X: Train data and test data.
-    - y: The label of train data.
-    - k: The number of nearest neighbors.
+    - X: Data.
+    - y: Labels.
+    - num_neighbors: The number of neighbors for each node.
+    - density: The edge density in the random graph.
     Return:
-        - the knn graph of the data.
+    - A random graph as a PyTorch Geometric Data object.
     '''
-    knn=NearestNeighbors(n_neighbors=k,metric=metric)
-    knn.fit(X)
-    _, indices = knn.kneighbors(X) # Indices of the nearest points in the population matrix.
-    adj_mat=np.zeros((len(X),len(X)))
-    for i in range(len(X)):
-        for j in range(k):
-            adj_mat[i][indices[i][j]] = 1
-            adj_mat[indices[i][j]][i] = 1
-    edge_index = []
-    for i in range(len(X)):
-        for j in range(len(X)):
-            if j>i and adj_mat[i][j]==1:
-                edge_index.append([i,j])
-    edge_index = torch.tensor(edge_index).T
-    edge_index = edge_index.to(device)
-    X=X.astype(np.float32)
-    X = torch.tensor(X).float().to(device)
-    y = torch.tensor(y).long().to(device)
-    # print(X.shape,y.shape)
-    data = pyg.data.Data(x=X,edge_index=edge_index, y=y)
+
+    num_nodes = len(X)
+    adj_mat = np.zeros((num_nodes, num_nodes))
+
+    for i in range(num_nodes):
+        for j in range(i + 1, num_nodes):
+            if np.random.rand() < density:
+                adj_mat[i][j] = 1
+                adj_mat[j][i] = 1
+
+    # Randomly select 'num_neighbors' neighbors for each node
+    for i in range(num_nodes):
+        neighbors = np.where(adj_mat[i] == 1)[0]
+        if len(neighbors) > num_neighbors:
+            random_neighbors = np.random.choice(neighbors, num_neighbors, replace=False)
+            adj_mat[i] = 0
+            adj_mat[i][random_neighbors] = 1
+
+    edge_index = np.where(adj_mat == 1)
+    edge_index = torch.tensor(edge_index, dtype=torch.long).to(device)
+
+    X = X.astype(np.float32).to(device)
+    X = torch.tensor(X, dtype=torch.float32).to(device)
+    y = torch.tensor(y, dtype=torch.long).to(device)
+
+    data = pyg.data.Data(x=X, edge_index=edge_index, y=y)
+
     return data
+
+
+
+
+
 
 X = np.concatenate((X_train, X_valid, X_test), axis=0)
 # y=np.concatenate((y_train_master,y_valid_master,y_test_master),axis=0) # for ANDI
@@ -61,13 +115,15 @@ y = np.concatenate((y_train, y_valid, y_test), axis=0)
 # y[y==4]=1
 # y[y==-1]=2
 # print(X,y)
-data = construct_knn_graph(X, y, k=10, metric='euclidean')
+# data = construct_knn_graph(X, y, k=50, metric='euclidean')
+data = construct_random_graph(X, y, num_neighbors=50, density=0.1)
 
 train_idx = np.array(range(X_train.shape[0]))
-val_idx = np.array(range(X_train.shape[0],X_train.shape[0]+X_valid.shape[0]))
-test_idx = np.array(range(X_train.shape[0]+X_valid.shape[0],X_train.shape[0]+X_valid.shape[0]+X_test.shape[0]))
+val_idx = np.array(range(X_train.shape[0], X_train.shape[0]+X_valid.shape[0]))
+train_and_val_idx = np.array(range(X_train.shape[0]+X_valid.shape[0]))
+test_idx = np.array(range(X_train.shape[0]+X_valid.shape[0], X_train.shape[0]+X_valid.shape[0]+X_test.shape[0]))
 print(X.shape, y.shape)
-all_f = np.zeros((X.shape[0],),dtype=np.bool)
+all_f = np.zeros((X.shape[0],), dtype=np.bool)
 
 all_f_tmp = all_f.copy()
 all_f_tmp[train_idx] = True
@@ -78,15 +134,20 @@ all_f_tmp[val_idx] = True
 val_mask = all_f_tmp
 
 all_f_tmp = all_f.copy()
+all_f_tmp[train_and_val_idx] = True
+train_and_val_mask = all_f_tmp
+
+all_f_tmp = all_f.copy()
 all_f_tmp[test_idx] = True
 test_mask = all_f_tmp
 
-print(y.shape, train_idx.shape, val_idx.shape, test_idx.shape)
-print(train_mask.shape, val_mask.shape, test_mask.shape)
-print(y[train_mask].shape, y[val_mask].shape, y[test_mask].shape)
+print(y.shape, train_idx.shape, val_idx.shape, train_and_val_idx.shape, test_idx.shape)
+print(train_mask.shape, val_mask.shape, train_and_val_mask.shape, test_mask.shape)
+print(y[train_mask].shape, y[val_mask].shape, y[train_and_val_mask].shape, y[test_mask].shape)
 
 data.train_mask = train_mask
 data.val_mask = val_mask
+data.train_and_val_mask = train_and_val_mask
 data.test_mask = test_mask
 
 
@@ -113,29 +174,28 @@ class GCN(torch.nn.Module):
     def __init__(self):
         super(GCN, self).__init__()
         # GCNConv模型输入参数：输入结点特征维度，输出结点特征维度，是否cached和是否normalize；
-        self.conv1 = pyg_nn.GCNConv(num_features, 16, cached=True,
-                             normalize=not args.use_gdc)
-        self.conv2 = pyg_nn.GCNConv(16, num_classes, cached=True,
-                             normalize=not args.use_gdc)
-        self.fc3 = nn.Linear(num_classes, 32)
-        self.fc4 = nn.Linear(32, num_classes)
+        self.conv1 = pyg_nn.GCNConv(num_features, 16, cached=True, normalize=not args.use_gdc)
+        self.conv2 = pyg_nn.GCNConv(16, num_classes, cached=True, normalize=not args.use_gdc)
+        self.fc3 = nn.Linear(num_classes, 16)
+        self.fc4 = nn.Linear(16, num_classes)
         self.reg_params = self.conv1.parameters()
         self.non_reg_params = self.conv2.parameters()
-        self.fc5 = nn.Linear(num_classes, num_classes)
+        self.bn = nn.BatchNorm1d(16)
 
     def forward(self):
         x, edge_index, edge_weight = data.x, data.edge_index, data.edge_attr
         
         x = self.conv1(x, edge_index, edge_weight)
+        x = self.bn(x)
         x = F.relu(x)
-        x = F.dropout(x, training=self.training)  # dropout操作，避免过拟合
-
         x = self.conv2(x, edge_index, edge_weight)
+        # x = F.relu(x)
+        # x = self.bn2(x)
+
         
         x = self.fc3(x)
         x = F.relu(x)
         x = self.fc4(x)
-        # x=F.dropout(x,training=self.training)
 
         return F.log_softmax(x, dim=1)  # 模型最后一层接上一个softmax和CNN类似
 
@@ -149,31 +209,32 @@ model, data = GCN().to(device), data.to(device)
 # ], lr=1e-2, momentum=0.9, nesterov=True)
 
 optimizer = torch.optim.AdamW([
-    dict(params=model.reg_params),
-    dict(params=model.non_reg_params)
+    dict(params=model.reg_params, weight_decay=5e-4),
+    dict(params=model.non_reg_params, weight_decay=0)
 ], lr=1e-2)
 
-lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, step_size=5000, gamma=0.1)
+lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, step_size=5000, gamma=0.5)
 
 
 def train():
     model.train()
     optimizer.zero_grad()
     output = model()
-    loss = F.nll_loss(output[data.train_mask],data.y[data.train_mask])
+    loss = F.nll_loss(output[data.train_and_val_mask], data.y[data.train_and_val_mask])
     loss.backward()
     optimizer.step()
     lr_scheduler.step()
     return loss
 
-@torch.no_grad()
+# @torch.no_grad()
 
 def test():
     model.eval()
     log, accs = model(), []
-    for _,mask in data('train_mask','val_mask','test_mask'):
+    for _, mask in data('train_mask', 'val_mask', 'test_mask'):
         pred = log[mask].max(1)[1]
-        # print(mask,data.y[mask].shape)
+        # print("pred", pred)
+        # print("data", data.y[mask])
         acc = pred.eq(data.y[mask]).sum().item()/mask.sum().item()
         accs.append(acc)
     return accs
@@ -187,4 +248,5 @@ for epoch in range(1, 30001):
         best_val_acc = val_acc
         test_acc = tmp_test_acc
     log = 'Epoch: {:03d}, Loss:{:.4f}, Train: {:.4f}, Val: {:.4f}, Test: {:.4f}'
-    print(log.format(epoch, loss, train_acc, best_val_acc, test_acc))
+    if epoch % 100 == 0:
+        print(log.format(epoch, loss, train_acc, best_val_acc, test_acc))
