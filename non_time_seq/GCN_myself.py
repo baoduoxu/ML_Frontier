@@ -41,7 +41,7 @@ num_classes = len(Labels)
 
 
 ### Construct the graph
-def construct_knn_graph(X, y, val_idx, k=5, metric='unsupervised', ratio=0.3, drop_class=0, density=0.1, drop_edges=0):
+def construct_knn_graph(X, y, val_idx, k=5, metric='unsupervised', ratio=0.3, drop_class=2, density=0.1, drop_edges=200):
     '''
     Description: Construct the knn graph of the data.
     Input:
@@ -71,10 +71,10 @@ def construct_knn_graph(X, y, val_idx, k=5, metric='unsupervised', ratio=0.3, dr
             if i >= val_idx[0] and i<test_idx[0] and j >= val_idx[0] and j<test_idx[0]: # 验证集内部进行删边
                 if adj_mat[i][j]==1:
                     # print(np.linalg.norm(np.squeeze(X[i])-np.squeeze(X[j])))
-                    dist_valid.append([np.linalg.norm(X[i]-X[j]),[i,j]])
+                    dist_valid.append([np.linalg.norm(X[i]-X[j]),[i,j],int(y[i]==y[j])])
             if i>=test_idx[0] and j>=test_idx[0]: # 测试集内部进行删边
                 if adj_mat[i][j]==1:
-                    dist_test.append([np.linalg.norm(X[i]-X[j]),[i,j]])
+                    dist_test.append([np.linalg.norm(X[i]-X[j]),[i,j],int(y[i]==y[j])])
                 # 测试集内部进行删边
                 # drop_edge_idx_test = random.sample(range(val_idx[0],test_idx[0]), drop_edges)
                 # if indices[i][j] >= test_idx[0] and y[indices[i][j]] in drop_edge_idx_test:
@@ -90,6 +90,16 @@ def construct_knn_graph(X, y, val_idx, k=5, metric='unsupervised', ratio=0.3, dr
                 #     adj_mat[indices[i][j]][i] = 1
     dist_valid.sort(key=lambda x:x[0],reverse=True)
     dist_test.sort(key=lambda x:x[0],reverse=True) # 按照距离进行排序
+    # print(dist_valid,dist_test)
+    same_class=np.sum([i[2] for i in dist_valid])
+    print(same_class,len(dist_valid))
+    same_class=np.sum([i[2] for i in dist_test])
+    print(same_class,len(dist_test))
+
+    same_class=np.sum([dist_valid[i][2] for i in range(drop_edges)])
+    print(same_class,drop_edges)
+    same_class=np.sum([dist_test[i][2] for i in range(drop_edges)])
+    print(same_class,drop_edges)
     dist_valid=np.array(dist_valid)
     dist_test=np.array(dist_test)
     drop_valid=dist_valid[:drop_edges]

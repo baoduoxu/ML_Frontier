@@ -1,5 +1,5 @@
 # 对数据进行降维
-from data_process import X_test,X_train,y_test,y_train,Labels
+# from data_process import X_test,X_train,y_test,y_train,Labels
 # from data_process import X_test_MCI,X_train_MCI,y_test_MCI,y_train_MCI
 import seaborn as sns
 import numpy as np
@@ -15,33 +15,33 @@ from sklearn.manifold import Isomap
 from sklearn.manifold import MDS
 
 # 计算相关系数矩阵画热力图
-def heatmap():
-    correlation = np.corrcoef(X_train.T) # X_train的形状为(214, 186)
-    print(correlation)
+# def heatmap():
+#     correlation = np.corrcoef(X_train.T) # X_train的形状为(214, 186)
+#     print(correlation)
 
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(correlation, cmap="coolwarm", annot=False)  # 使用不同的颜色映射和关闭标注
+#     plt.figure(figsize=(10, 8))
+#     sns.heatmap(correlation, cmap="coolwarm", annot=False)  # 使用不同的颜色映射和关闭标注
 
-    # 添加标签和标题
-    plt.xlabel("Features")
-    plt.ylabel("Features")
-    plt.title("Correlation Heatmap")
+#     # 添加标签和标题
+#     plt.xlabel("Features")
+#     plt.ylabel("Features")
+#     plt.title("Correlation Heatmap")
 
-    # 显示热力图
-    plt.show()
+#     # 显示热力图
+#     plt.show()
 
-def QQ():
-    # Q-Q图 验证是否符合正态分布, 除了极少数特殊的列, 基本符合
-    for i in range(10):
-        normal_sample = np.random.normal(size=len(X_train))
+# def QQ():
+#     # Q-Q图 验证是否符合正态分布, 除了极少数特殊的列, 基本符合
+#     for i in range(10):
+#         normal_sample = np.random.normal(size=len(X_train))
 
-        stats.probplot(X_train[:, i], dist="norm", plot=plt)
-        plt.title("Q-Q Plot for Sample Dimension 0")
-        plt.xlabel("Theoretical Quantiles")
-        plt.ylabel("Sample Quantiles")
+#         stats.probplot(X_train[:, i], dist="norm", plot=plt)
+#         plt.title("Q-Q Plot for Sample Dimension 0")
+#         plt.xlabel("Theoretical Quantiles")
+#         plt.ylabel("Sample Quantiles")
 
-        # 显示图形
-        plt.show()
+#         # 显示图形
+#         plt.show()
 
 def dimension_reduction(X,y,dim=2,method='LDA'):
     print(f'before dimension reduction: {X.shape}')

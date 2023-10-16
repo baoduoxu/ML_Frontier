@@ -16,6 +16,11 @@ import torch.optim as optim
 from scipy.optimize import minimize
 # 主分类器
 dim=2
+
+X_train_reduced,_=dimension_reduction(X_train, y_train, dim=dim,method='LDA')
+visualization(X_train_reduced,y_train,dim=dim,method='LDA',class_num=5)
+
+
 def _svm(X_train,y_train,X_test,y_test):
         print(X_train.shape,y_train.shape,X_test.shape,y_test.shape)
         clf=svm.SVC(kernel='linear',C=1.0,random_state=0,decision_function_shape='ovr')
