@@ -21,15 +21,17 @@ set_seed(seed)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 ### Hyperparameters
-run_epochs = 50000
+run_epochs = 200
 lr = 0.01
 weight_decay = 5e-4
 graph_type = 'knn'      # 'knn', 'random1', 'random2'
 k_neighbors = 30
-knn_metric = 'cosine'      # 'cosine', 'p', 'sqeucledian', 
+knn_metric = 'cosine'      # 'cosine', 'p', 'sqeucledian'
 drop_ratio = 1
 # 'seuclidean', 'p', 'sqeuclidean', 'mahalanobis', 'pyfunc', 'jaccard', 'nan_euclidean', 'cityblock', 'manhattan', 'precomputed', 'cosine', 'yule', 'infinity', 'sokalsneath', 'rogerstanimoto', 'euclidean', 'russellrao', 'canberra', 'haversine', 'correlation', 'l1', 'chebyshev', 'sokalmichener', 'braycurtis', 'dice', 'l2', 'hamming', 'minkowski'
 density = 0.1
+
+
 
 
 ### Load data
@@ -40,12 +42,12 @@ num_features = X_train.shape[1]
 num_classes = len(Labels)
 
 
-### Construct the graph
-def construct_knn_graph(X, y, val_idx, k=5, metric='unsupervised', ratio=0.3, drop_class=0):
+## Construct the graph
+def construct_knn_graph(X, y, val_idx, k=5, metric='unsupervised', ratio=0.3, drop_class=1, density=0.1, drop_edges=24):
     '''
     Description: Construct the knn graph of the data.
     Input:
-    - X: Train data and test data.
+    - X: Train data and test data
     - y: The label of train data.
     - k: The number of nearest neighbors.
     Return:
@@ -57,29 +59,67 @@ def construct_knn_graph(X, y, val_idx, k=5, metric='unsupervised', ratio=0.3, dr
     adj_mat = np.zeros((len(X), len(X)))
     for i in range(len(X)):
         for j in range(k):
-            if i >= val_idx[0]:
-                # 随机选择 drop_class 个类，断开与这些类的连边
+            if i>=val_idx[0]:
                 drop_class_idx = random.sample(range(len(Labels)), drop_class)
                 if indices[i][j] < val_idx[0] and y[indices[i][j]] in drop_class_idx:
                     continue
+            adj_mat[i][indices[i][j]] = 1
+            adj_mat[indices[i][j]][i] = 1
+
+    dist_valid=[]
+    dist_test=[]
+    for i in range(len(X)):  # 尝试一些删边手段，修改邻接矩阵
+        for j in range(i+1,len(X)):
+            if i >= val_idx[0] and i<test_idx[0] and j >= val_idx[0] and j<test_idx[0]: # 验证集内部进行删边
+                if adj_mat[i][j]==1:
+                    # print(np.linalg.norm(np.squeeze(X[i])-np.squeeze(X[j])))
+                    dist_valid.append([np.linalg.norm(X[i]-X[j]),[i,j]])
+            if i>=test_idx[0] and j>=test_idx[0]: # 测试集内部进行删边
+                if adj_mat[i][j]==1:
+                    dist_test.append([np.linalg.norm(X[i]-X[j]),[i,j]])
+                # 测试集内部进行删边
+                # drop_edge_idx_test = random.sample(range(val_idx[0],test_idx[0]), drop_edges)
+                # if indices[i][j] >= test_idx[0] and y[indices[i][j]] in drop_edge_idx_test:
+                #     continue
+
+                # 随机选择 drop_class 个类，断开测试集和验证集中的样本与训练集中这些类的连边
+            
+
                 # 随机选择 k/2 个邻居连边
-                random_sample = random.sample(range(k), int(k*ratio))
-                if j in random_sample:
-                    adj_mat[i][indices[i][j]] = 1
-                    adj_mat[indices[i][j]][i] = 1
-            else:
-                adj_mat[i][indices[i][j]] = 1
-                adj_mat[indices[i][j]][i] = 1
+                # random_sample = random.sample(range(k), int(k*ratio))
+                # if j in random_sample:
+                #     adj_mat[i][indices[i][j]] = 1
+                #     adj_mat[indices[i][j]][i] = 1
+    dist_valid.sort(key=lambda x:x[0],reverse=True)
+    dist_test.sort(key=lambda x:x[0],reverse=True) # 按照距离进行排序
+    dist_valid=np.array(dist_valid)
+    dist_test=np.array(dist_test)
+    drop_valid=dist_valid[:drop_edges]
+    drop_test=dist_test[:drop_edges]
+    for _,idx in drop_valid:
+        adj_mat[idx[0]][idx[1]]=0
+        adj_mat[idx[1]][idx[0]]=0
+    for _,idx in drop_test:
+        adj_mat[idx[0]][idx[1]]=0
+        adj_mat[idx[1]][idx[0]]=0
+    for i in val_idx:
+        for j in test_idx:
+            adj_mat[i][j]=0
+            adj_mat[j][i]=0
+    # 将连边加入邻接矩阵
     edge_index = []
     for i in range(len(X)):
-        for j in range(len(X)):
-            if j>i and adj_mat[i][j]==1: # 对于训练集中的数据，只有两个是同一类才连边
+        for j in range(i+1,len(X)):
+            # 随机断开验证集和测试集内的点与连边
+            if adj_mat[i][j]==1: # 对于训练集中的数据，只有两个是同一类才连边
                 # edge_index.append([i,j])
                 if i>=train_num or j>=train_num: # 如果两个点有一个不是训练集，就直接根据邻接矩阵连边
                     edge_index.append([i, j])
                 if i<train_num and j<train_num and y[i]==y[j]:
                     edge_index.append([i, j])
-
+                # if i >= val_idx[0] and np.random.rand()<=density: # 对于验证集内部的点，随机断开一些连边
+                # drop_edge_idx = random.sample(range(val_idx[0],test_idx[0]), drop_edges)
+                # if 
     edge_index = torch.tensor(edge_index).T
     edge_index = edge_index.to(device)
     X = X.astype(np.float32)
@@ -88,6 +128,44 @@ def construct_knn_graph(X, y, val_idx, k=5, metric='unsupervised', ratio=0.3, dr
     # print(X.shape,y.shape)
     data = pyg.data.Data(x=X, edge_index=edge_index, y=y)
     return data
+
+
+# def construct_knn_graph(X, y, val_idx, k=5, metric='unsupervised', ratio=0.3, drop_class=0, density=0.1, drop_edges=0):
+#     '''
+#     Description: Construct the knn graph of the data.
+    
+#     Input:
+#     - X: Train data and test data.
+#     - y: The label of train data.
+#     - k: The number of nearest neighbors.
+    
+#     Return:
+#         - the knn graph of the data.
+#     '''
+#     knn=NearestNeighbors(n_neighbors=k, metric=metric)
+#     knn.fit(X)
+#     _, indices = knn.kneighbors(X) # Indices of the nearest points in the population matrix.
+#     adj_mat=np.zeros((len(X),len(X)))
+#     for i in range(len(X)):
+#         for j in range(k):
+#             adj_mat[i][indices[i][j]]=1
+#     edge_index = []
+#     for i in range(len(X_train)):
+#         for j in range(len(X_train)):
+#             if j>i and adj_mat[i][j]==1:
+#                 edge_index.append([i,j])
+#     edge_index = torch.tensor(edge_index).T
+#     edge_index = edge_index.to(device)
+#     X=X.astype(np.float32)
+#     X = torch.tensor(X).float().to(device)
+#     y = torch.tensor(y).long().to(device)
+#     # print(X.shape,y.shape)
+#     data = pyg.data.Data(x=X,edge_index=edge_index,y=y)
+#     return data
+
+
+
+
 
 
 def construct_random1_graph(X, y, num_neighbors=5, density=0.1):
@@ -169,16 +247,16 @@ class GCN(nn.Module):
         # self.conv1 = GCNConv(num_node_features, 64)
         # self.conv2 = GCNConv(64, num_classes)
         # self.norm = torch.nn.BatchNorm1d(64)
-        self.conv1 = GATConv(num_node_features, 16, heads=8, dropout=0.5)
-        self.conv2 = GATConv(16*8, num_classes, heads=8, concat=False, dropout=0.5)
-        self.norm = torch.nn.BatchNorm1d(16*8)
+        self.conv1 = GATConv(num_node_features, 4, heads=8, dropout=0.5)
+        self.conv2 = GATConv(4*8, num_classes, heads=8, concat=False, dropout=0.5)
+        self.norm = torch.nn.BatchNorm1d(4*8)
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
 
         x = self.conv1(x, edge_index)
         x = self.norm(x)
-        x = F.tanh(x)
+        x = F.relu(x)
         # x = F.dropout(x, training=self.training)
         x = self.conv2(x, edge_index)
 
@@ -209,7 +287,9 @@ def train():
             best_test_acc = test_acc
             best_test_epoch = epoch + 1
             print("Best Epoch {:03d}: Train: {:.4f}, Val: {:.4f}, Test: {:.4f}".format(epoch+1, train_acc, val_acc, test_acc))
-
+        if (epoch+1) <100:
+            log = 'Epoch: {:03d}, Loss:{:.4f}, Train: {:.4f}, Val: {:.4f}, Test: {:.4f}; Best Test: {:.4f} (epoch {:03d})'
+            print(log.format(epoch+1, loss, train_acc, val_acc, test_acc, best_test_acc, best_test_epoch))
         if (epoch+1) % 100 == 0:
             log = 'Epoch: {:03d}, Loss:{:.4f}, Train: {:.4f}, Val: {:.4f}, Test: {:.4f}; Best Test: {:.4f} (epoch {:03d})'
             print(log.format(epoch+1, loss, train_acc, val_acc, test_acc, best_test_acc, best_test_epoch))
@@ -243,11 +323,11 @@ if __name__ == '__main__':
     all_f = np.zeros((X.shape[0],), dtype=np.bool)
 
     if graph_type == 'knn':
-        data = construct_knn_graph(X, y, val_idx=val_idx, k=k_neighbors, metric=knn_metric, ratio=drop_ratio)
+        data = construct_knn_graph(X, y, val_idx=val_idx, k=k_neighbors, metric=knn_metric, ratio=drop_ratio, density=density)
     elif graph_type == 'random1':
-        data = construct_random1_graph(X, y, val_idx=val_idx, num_neighbors=k_neighbors, density=density)
+        data = construct_random1_graph(X, y, num_neighbors=k_neighbors, density=density)
     elif graph_type == 'random2':
-        data = construct_random2_graph(X, y, val_idx=val_idx, num_neighbors=k_neighbors, prob_rewire=density)
+        data = construct_random2_graph(X, y, num_neighbors=k_neighbors, prob_rewire=density)
 
     all_f_tmp = all_f.copy()
     all_f_tmp[train_idx] = True

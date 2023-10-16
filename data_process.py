@@ -11,15 +11,6 @@ import random
 
 # 设置随机种子
 seed = 0
-torch.manual_seed(seed)
-torch.cuda.manual_seed(seed)
-torch.cuda.manual_seed_all(seed)
-np.random.seed(seed)
-random.seed(seed)
-torch.manual_seed(seed)
-torch.backends.cudnn.benchmark = False
-torch.backends.cudnn.deterministic = True
-print('Random seed is set to {}.'.format(seed))
 
 def set_seed(seed):
     torch.manual_seed(seed)
@@ -32,16 +23,18 @@ def set_seed(seed):
     torch.backends.cudnn.deterministic = True
     print('Random seed is set to {}.'.format(seed))
 
-
-set_seed(0)
+set_seed(seed)
 
 # if len(sys.argv)!=2:
 #     print('Usage: python data_process.py <dataset_path>')
 #     sys.exit(1)
 
+
+
 # file_path=sys.argv[1]
-# file_path='dataset/ADNI.mat'
-file_path='dataset/PPMI.mat'
+file_path='dataset/ADNI.mat'
+# file_path='dataset/PPMI.mat'
+# file_path='dataset/FTD_90_200_fMRI.mat'
 mat_data=scipy.io.loadmat(file_path)
 # print(mat_data.keys())
 train_ratio=0.6

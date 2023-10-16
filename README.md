@@ -1,4 +1,4 @@
-# Machine Learning Frontier Project
+# Machine Learning Frontier Project 1
 
 ## Method Chosen
 

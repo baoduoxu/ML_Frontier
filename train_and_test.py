@@ -17,9 +17,9 @@ def train_and_test(net,num_epochs,train_dataset,test_dataset,batch_size,optimize
         for X, y in train_iter: # 遍历测试集的每一个样本
             y=y.long()
             X, y = X.to(device), y.to(device) # 数据移至GPU
-            output=net(X,init_hidden)
+            output = net(X, init_hidden).to(device)
             optimizer.zero_grad() # 清空梯度
-            l=loss(output,y) 
+            l = loss(output, y) 
             l.backward() # 反向传播
             train_l_sum+=l.item() # 计算总的loss
             optimizer.step() # 更新模型参数
@@ -41,8 +41,9 @@ def train_and_test(net,num_epochs,train_dataset,test_dataset,batch_size,optimize
             test_acc=correct/n_test
             test_accs.append(test_acc)
         losses.append(train_l_sum / n_train)
-        print('epoch %d, loss %.4f, train acc %.3f, test acc %.3f'
+        if (epoch+1) % 50 == 0:
+            print('epoch %d, loss %.4f, train acc %.3f, test acc %.3f'
             % (epoch + 1, train_l_sum / n_train, train_acc, test_acc))
         torch.cuda.empty_cache() # unleash the memory of GPU
         
-    return losses,train_accs,test_accs # 返回训练过程中的所有信息
+    return losses, train_accs, test_accs # 返回训练过程中的所有信息

@@ -13,13 +13,13 @@ sys.path.append(os.path.dirname(os.path.dirname(
 
 
 
-X_train = torch.Tensor(np.mean(X_train, axis=2))
+X_train = torch.Tensor(np.mean(X_train, axis=2)).to(device)
 
-y_train = torch.Tensor(y_train)
+y_train = torch.Tensor(y_train).to(device)
 
-X_test = torch.Tensor(np.mean(X_test, axis=2))
+X_test = torch.Tensor(np.mean(X_test, axis=2)).to(device)
 
-y_test = torch.Tensor(y_test)
+y_test = torch.Tensor(y_test).to(device)
 
 # 将X_train从2维张量变成3维张量
 X_train = torch.unsqueeze(X_train, dim=2)
@@ -67,11 +67,11 @@ class MLLSTM(nn.Module):
 
     def initHidden(self, batch_size):
         # both hidden and cell states
-        return (torch.ones(self.num_layers * 1, batch_size, self.hidden_size),
-                torch.ones(self.num_layers * 1, batch_size, self.hidden_size))
+        return (torch.ones(self.num_layers * 1, batch_size, self.hidden_size).to(device),
+                torch.ones(self.num_layers * 1, batch_size, self.hidden_size).to(device))
 
 
-net = MLLSTM(input_size, hidden_size, num_layers, output_size)
+net = MLLSTM(input_size, hidden_size, num_layers, output_size).to(device)
 print(net)
 num_epochs = 600
 lr, momentum, weight_decay = 0.0008, 0.9, 0.001
@@ -81,7 +81,7 @@ optimizer = torch.optim.RMSprop(net.parameters(),
                                 weight_decay=weight_decay)
 # optimizer=torch.optim.AdamW(net.parameters(), lr=lr, weight_decay=weight_decay)
 # optimizer=torch.optim.Adagrad(net.parameters(), lr=lr, weight_decay=weight_decay)
-loss = nn.CrossEntropyLoss()
+loss = nn.CrossEntropyLoss().to(device)
 init_hidden = torch.zeros(num_layers * num_directions, batch_size,
                           hidden_size).to(device)
 losses, train_accs, test_accs = train_and_test(net, num_epochs, train_dataset,
