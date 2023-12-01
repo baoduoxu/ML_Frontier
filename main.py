@@ -47,6 +47,9 @@ if __name__ == "__main__":
 
         encoder = encoder.to(db_cfg.device)
         decoder = decoder.to(db_cfg.device)
+        trainDataset = trainDataset.to(db_cfg.device)
+        testDataset = testDataset.to(db_cfg.device)
+        
         optimizer = torch.optim.AdamW(list(encoder.parameters(
         )) + list(decoder.parameters()), db_cfg.lr, weight_decay=0.9)
         
